@@ -187,18 +187,13 @@ function processMathUniversal(input, mode) {
                 let f2_B = B / g;
                 let f2_str = (f2_A === 1 ? '' : (f2_A === -1 ? '-' : f2_A)) + v + (f2_B > 0 ? '+' : '') + f2_B;
 
-                steps.push(`${f1_str}(${f2_str})=0 <span class="highlight-text">(It's pulling out the GCF)</span>`);
-                steps.push(`${f1_str}=0 <span class="highlight-text">(It's setting each factor to zero)</span>`);
+                steps.push(`${f1_str}(${f2_str})=0`);
+                steps.push(`${f1_str}=0`);
                 steps.push(`${f2_str}=0`);
-                
-                if (f1_coef !== 1 && f1_coef !== -1) {
-                     steps.push(`${v}=0 <span class="highlight-text">(It's dividing by ${f1_coef})</span>`);
-                } else {
-                     steps.push(`${v}=0`);
-                }
+                steps.push(`${v}=0`);
 
                 let ans2 = simplifyFraction(-f2_B, f2_A);
-                steps.push(`${v}=${ans2} <span class="highlight-text">(Then, it states the answer)</span>`);
+                steps.push(`${v}=${ans2}`);
 
                 return {
                     isError: false,
@@ -209,16 +204,16 @@ function processMathUniversal(input, mode) {
             } 
             // Square Root Method (e.g., 25b^2 = 1)
             else if (B === 0 && C !== 0) {
-                steps.push(`${A}${v}^2 = ${-C} <span class="highlight-text">(Isolating the squared term)</span>`);
+                steps.push(`${A}${v}^2 = ${-C}`);
                 let rightSide = simplifyFraction(-C, A);
                 
                 if (A !== 1) {
-                    steps.push(`${v}^2 = ${rightSide} <span class="highlight-text">(Dividing by ${A})</span>`);
+                    steps.push(`${v}^2 = ${rightSide}`);
                 }
                 
                 let num = -C, den = A;
                 if (num * den < 0) {
-                    steps.push(`${v} = ±√(${rightSide}) <span class="highlight-text">(No real solution)</span>`);
+                    steps.push(`${v} = ±√(${rightSide})`);
                     return { isError: false, displayHTML: steps.join('<br>'), copyText: "No real solution" };
                 }
                 
@@ -228,10 +223,10 @@ function processMathUniversal(input, mode) {
                 
                 if (Math.sqrt(num) % 1 === 0 && Math.sqrt(den) % 1 === 0) {
                     let finalAns = simplifyFraction(Math.sqrt(num), Math.sqrt(den));
-                    steps.push(`${v} = ±${finalAns} <span class="highlight-text">(Taking the square root to find the answer)</span>`);
+                    steps.push(`${v} = ±${finalAns}`);
                     return { isError: false, hideDefaultCopy: false, displayHTML: steps.join('<br>'), copyText: `±${finalAns}` };
                 } else {
-                     steps.push(`${v} = ±√(${rightSide}) <span class="highlight-text">(Taking the square root to find the answer)</span>`);
+                     steps.push(`${v} = ±√(${rightSide})`);
                      return { isError: false, hideDefaultCopy: false, displayHTML: steps.join('<br>'), copyText: `±√(${rightSide})` };
                 }
             } else {
