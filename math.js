@@ -10,6 +10,8 @@ function openCalculator(mode, modeName) {
     const inputElement = document.getElementById('math-input');
     if (mode === 'power_of_i') {
         inputElement.placeholder = "Enter exponent (e.g., 4)... and press Enter";
+    } else if (mode === 'complex_ops') {
+        inputElement.placeholder = "Enter expression (e.g., (3+4i)+(7+11i))...";
     } else {
         inputElement.placeholder = "Enter quadratic equation (e.g., x^2+5x+6=0)...";
     }
@@ -121,7 +123,84 @@ function processMathUniversal(input, mode) {
     try {
         const cleanInput = input.trim();
 
-        if (mode === 'power_of_i') {
+        if (mode === 'complex_ops') {
+            // Remove spaces and normalize isolated "i" to "1i"
+            let clean = cleanInput.replace(/\s+/g, '');
+            clean = clean.replace(/\+i\)/g, '+1i)').replace(/\-i\)/g, '-1i)');
+            
+            const complexRegex = /^\((-?\d+)([+-]\d+)i\)([+-])?\((-?\d+)([+-]\d+)i\)$/;
+            let match = clean.match(complexRegex);
+            
+            if (!match) return { isError: true };
+
+            let a1 = parseInt(match[1]);
+            let b1 = parseInt(match[2]);
+            let op = match[3] || '*'; // If no operator, assume multiplication
+            let a2 = parseInt(match[4]);
+            let b2 = parseInt(match[5]);
+
+            let steps = [];
+            steps.push(`${cleanInput}`);
+
+            // Addition and Subtraction
+            if (op === '+' || op === '-') {
+                let realPart = op === '+' ? a1 + a2 : a1 - a2;
+                let imagPart = op === '+' ? b1 + b2 : b1 - b2;
+                
+                let a2_str = (a2 < 0 && op === '-') ? `(${a2})` : a2;
+                let b2_str = (b2 < 0 && op === '-') ? `(${b2}i)` : `${b2}i`;
+                
+                steps.push(`(${a1} ${op} ${a2_str}) + (${b1}i ${op} ${b2_str})`);
+                
+                let imagStr = imagPart >= 0 ? `+${imagPart}i` : `${imagPart}i`;
+                let finalAns = `${realPart}${imagStr}`;
+                steps.push(finalAns);
+                
+                return {
+                    isError: false,
+                    hideDefaultCopy: false,
+                    displayHTML: steps.join('<br>'),
+                    copyText: finalAns
+                };
+            } 
+            // Multiplication (FOIL)
+            else if (op === '*') {
+                let first = a1 * a2;
+                let outer = a1 * b2;
+                let inner = b1 * a2;
+                let last = b1 * b2;
+                
+                let outerStr = outer >= 0 ? `+ ${outer}` : `- ${Math.abs(outer)}`;
+                let innerStr = inner >= 0 ? `+ ${inner}` : `- ${Math.abs(inner)}`;
+                let lastStr = last >= 0 ? `+ ${last}` : `- ${Math.abs(last)}`;
+                
+                steps.push(`${first} ${outerStr}i ${innerStr}i ${lastStr}i^2`);
+                
+                let midSum = outer + inner;
+                let midStr = midSum >= 0 ? `+ ${midSum}` : `- ${Math.abs(midSum)}`;
+                
+                steps.push(`${first} ${midStr}i ${lastStr}(-1)`);
+                
+                let newLast = -last;
+                let newLastStr = newLast >= 0 ? `+ ${newLast}` : `- ${Math.abs(newLast)}`;
+                
+                steps.push(`${first} ${midStr}i ${newLastStr}`);
+                
+                let finalReal = first + newLast;
+                let finalAns = `${finalReal}${midSum >= 0 ? '+' : ''}${midSum}i`;
+                
+                steps.push(finalAns);
+                
+                return {
+                    isError: false,
+                    hideDefaultCopy: false,
+                    displayHTML: steps.join('<br>'),
+                    copyText: finalAns
+                };
+            }
+        }
+
+        else if (mode === 'power_of_i') {
             if (!/^-?\d+$/.test(cleanInput)) return { isError: true };
             const exponent = parseInt(cleanInput, 10);
             const mod = ((exponent % 4) + 4) % 4;
@@ -176,7 +255,7 @@ function processMathUniversal(input, mode) {
                 return x;
             };
 
-            // CASE 1: GCF Factoring (e.g., 3a^2 + 9a = 0)
+            // CASE 1: GCF Factoring
             if (B !== 0 && C === 0) {
                 let eqStr = `${A === 1 ? '' : (A === -1 ? '-' : A)}${v}^2${B > 0 ? '+' : ''}${B === 1 ? '' : (B === -1 ? '-' : B)}${v}=0`;
                 if (cleanInput.replace(/\s+/g,'') !== eqStr && !cleanInput.includes('²')) {
@@ -195,11 +274,9 @@ function processMathUniversal(input, mode) {
 
                 steps.push(`${f1_str}(${f2_str})=0`);
                 
-                // Factor 1
                 steps.push(`${f1_str}=0`);
                 steps.push(`${v}=0`);
 
-                // Factor 2
                 steps.push(`${f2_str}=0`);
                 let ans2 = simplifyFraction(-f2_B, f2_A);
                 steps.push(`${v}=${ans2}`);
@@ -212,7 +289,7 @@ function processMathUniversal(input, mode) {
                 };
             } 
 
-            // CASE 2: Difference of Squares (e.g., 25b^2 = 1)
+            // CASE 2: Difference of Squares
             else if (B === 0 && C !== 0) {
                 let eqStr = `${A === 1 ? '' : (A === -1 ? '-' : A)}${v}^2${C > 0 ? '+' : ''}${C}=0`;
                 if (cleanInput.replace(/\s+/g,'') !== eqStr) steps.push(`${eqStr}`);
@@ -250,7 +327,7 @@ function processMathUniversal(input, mode) {
                 }
             }
 
-            // CASE 3: Trinomials (e.g., x^2 + 5x + 6 = 0)
+            // CASE 3: Trinomials
             else if (B !== 0 && C !== 0) {
                 let eqStr = `${A === 1 ? '' : (A === -1 ? '-' : A)}${v}^2${B > 0 ? '+' : ''}${B === 1 ? '' : (B === -1 ? '-' : B)}${v}${C > 0 ? '+' : ''}${C}=0`;
                 if (cleanInput.replace(/\s+/g,'') !== eqStr) steps.push(`${eqStr}`);
@@ -287,12 +364,10 @@ function processMathUniversal(input, mode) {
 
                 steps.push(`${g_str}(${f1_str})(${f2_str})=0`);
 
-                // Factor 1
                 steps.push(`${f1_str}=0`);
                 let ans1 = simplifyFraction(-t1_c, t1_a);
                 steps.push(`${v}=${ans1}`);
 
-                // Factor 2
                 steps.push(`${f2_str}=0`);
                 let ans2 = simplifyFraction(-t2_c, t2_a);
                 steps.push(`${v}=${ans2}`);
