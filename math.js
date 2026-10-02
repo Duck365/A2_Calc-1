@@ -11,7 +11,7 @@ function openCalculator(mode, modeName) {
     if (mode === 'power_of_i') {
         inputElement.placeholder = "Enter exponent (e.g., 4)... and press Enter";
     } else {
-        inputElement.placeholder = "Enter equation (e.g., 3a^2+9a=0)... and press Enter";
+        inputElement.placeholder = "Enter quadratic equation (e.g., x^2+5x+6=0)...";
     }
     inputElement.focus();
 }
@@ -51,7 +51,7 @@ function processQuery(query) {
 
         if (result.isError) {
             const randNum = Math.floor(Math.random() * (500 - 50 + 1)) + 50;
-            sysMsg.innerHTML = `System: (<span class="error-text">Error ${randNum}:</span> Invalid Input) Please check your equation format.`;
+            sysMsg.innerHTML = `System: (<span class="error-text">Error ${randNum}:</span> Parsing Failed) Check the equation format.`;
         } else {
             sysMsg.innerHTML = `System:<br>${result.displayHTML}`;
             
@@ -96,7 +96,7 @@ function copyResult(button, text) {
     });
 }
 
-// Math Helper
+// Math Helpers
 function simplifyFraction(n, d) {
     if (n === 0) return "0";
     let sign = (n < 0) !== (d < 0) ? "-" : "";
@@ -107,6 +107,13 @@ function simplifyFraction(n, d) {
     n /= divisor;
     d /= divisor;
     return d === 1 ? `${sign}${n}` : `${sign}${n}/${d}`;
+}
+
+function formatFactor(coef, constVal, v) {
+    let term = (coef === 1) ? v : ((coef === -1) ? `-${v}` : `${coef}${v}`);
+    if (constVal === 0) return term;
+    let sign = constVal > 0 ? '+' : '-';
+    return `${term}${sign}${Math.abs(constVal)}`;
 }
 
 // --- UNIVERSAL MATH ENGINE ---
@@ -161,24 +168,21 @@ function processMathUniversal(input, mode) {
             if (A === 0) return { isError: true };
 
             let steps = [];
-            // Print the original input exactly as typed
-            steps.push(`${cleanInput}`); 
+            steps.push(`${cleanInput}`);
 
-            // GCF Factoring Method (e.g., 3a^2 + 9a = 0)
+            const gcdHelper = (x, y) => {
+                x = Math.abs(x); y = Math.abs(y);
+                while(y) { let t = y; y = x % y; x = t; }
+                return x;
+            };
+
+            // CASE 1: GCF Factoring (e.g., 3a^2 + 9a = 0)
             if (B !== 0 && C === 0) {
-                let eqStr = `${A === 1 ? '' : (A === -1 ? '-' : A)}${v}^2`;
-                eqStr += `${B > 0 ? '+' : ''}${B === 1 ? '' : (B === -1 ? '-' : B)}${v}=0`;
-                
-                // Only show the =0 step if the user didn't already type it
+                let eqStr = `${A === 1 ? '' : (A === -1 ? '-' : A)}${v}^2${B > 0 ? '+' : ''}${B === 1 ? '' : (B === -1 ? '-' : B)}${v}=0`;
                 if (cleanInput.replace(/\s+/g,'') !== eqStr && !cleanInput.includes('²')) {
                      steps.push(`${eqStr}`);
                 }
 
-                const gcdHelper = (x, y) => {
-                    x = Math.abs(x); y = Math.abs(y);
-                    while(y) { let t = y; y = x % y; x = t; }
-                    return x;
-                };
                 let g = gcdHelper(A, B);
                 if (A < 0) g = -g;
 
@@ -187,19 +191,15 @@ function processMathUniversal(input, mode) {
                 
                 let f2_A = A / g;
                 let f2_B = B / g;
-                let f2_str = (f2_A === 1 ? '' : (f2_A === -1 ? '-' : f2_A)) + v + (f2_B > 0 ? '+' : '') + f2_B;
+                let f2_str = formatFactor(f2_A, f2_B, v);
 
                 steps.push(`${f1_str}(${f2_str})=0`);
                 
-                // Group 1: First Factor
+                // Factor 1
                 steps.push(`${f1_str}=0`);
-                if (f1_coef !== 1 && f1_coef !== -1) {
-                     steps.push(`${v}=0`);
-                } else if (f1_coef === -1) {
-                     steps.push(`${v}=0`);
-                }
+                steps.push(`${v}=0`);
 
-                // Group 2: Second Factor
+                // Factor 2
                 steps.push(`${f2_str}=0`);
                 let ans2 = simplifyFraction(-f2_B, f2_A);
                 steps.push(`${v}=${ans2}`);
@@ -211,49 +211,33 @@ function processMathUniversal(input, mode) {
                     copyText: `${v}=0, ${v}=${ans2}`
                 };
             } 
-            // Difference of Squares Method (e.g., 25b^2 = 1)
+
+            // CASE 2: Difference of Squares (e.g., 25b^2 = 1)
             else if (B === 0 && C !== 0) {
-                let eqStr = `${A === 1 ? '' : (A === -1 ? '-' : A)}${v}^2`;
-                eqStr += `${C > 0 ? '+' : ''}${C}=0`;
+                let eqStr = `${A === 1 ? '' : (A === -1 ? '-' : A)}${v}^2${C > 0 ? '+' : ''}${C}=0`;
+                if (cleanInput.replace(/\s+/g,'') !== eqStr) steps.push(`${eqStr}`);
 
-                // Set equation to zero for factoring
-                if (cleanInput.replace(/\s+/g,'') !== eqStr) {
-                    steps.push(`${eqStr}`);
-                }
+                if (A * C > 0) return { isError: false, displayHTML: steps.join('<br>') + "<br>No real solution", copyText: "No real solution" };
 
-                if (A * C > 0) {
-                    return { isError: false, displayHTML: steps.join('<br>') + "<br>No real solution", copyText: "No real solution" };
-                }
-
-                const gcdHelper = (x, y) => {
-                    x = Math.abs(x); y = Math.abs(y);
-                    while(y) { let t = y; y = x % y; x = t; }
-                    return x;
-                };
                 let g = gcdHelper(A, C);
                 if (A < 0) g = -g;
 
-                let a_term = A / g;
-                let c_term = C / g; 
-
+                let a_term = A / g, c_term = C / g; 
                 let sqrtA = Math.sqrt(Math.abs(a_term));
                 let sqrtC = Math.sqrt(Math.abs(c_term));
 
-                // If it's a clean perfect square difference (like 25b^2 - 1 = 0)
                 if (sqrtA % 1 === 0 && sqrtC % 1 === 0) {
-                    let f1 = `${sqrtA === 1 ? '' : sqrtA}${v}-${sqrtC}`;
-                    let f2 = `${sqrtA === 1 ? '' : sqrtA}${v}+${sqrtC}`;
-
+                    let f1_str = formatFactor(sqrtA, -sqrtC, v);
+                    let f2_str = formatFactor(sqrtA, sqrtC, v);
                     let g_str = g === 1 ? '' : (g === -1 ? '-' : g.toString());
-                    steps.push(`${g_str}(${f1})(${f2})=0`);
 
-                    // Group 1: First Factor
-                    steps.push(`${f1}=0`);
+                    steps.push(`${g_str}(${f1_str})(${f2_str})=0`);
+
+                    steps.push(`${f1_str}=0`);
                     let ans1 = simplifyFraction(sqrtC, sqrtA);
                     steps.push(`${v}=${ans1}`);
 
-                    // Group 2: Second Factor
-                    steps.push(`${f2}=0`);
+                    steps.push(`${f2_str}=0`);
                     let ans2 = simplifyFraction(-sqrtC, sqrtA);
                     steps.push(`${v}=${ans2}`);
 
@@ -263,17 +247,65 @@ function processMathUniversal(input, mode) {
                         displayHTML: steps.join('<br>'),
                         copyText: `${v}=${ans1}, ${v}=${ans2}`
                     };
-                } else {
-                    // Fallback just in case it isn't a perfect square
-                    steps.push(`${A}${v}^2 = ${-C}`);
-                    let rightSide = simplifyFraction(-C, A);
-                    if (A !== 1) steps.push(`${v}^2 = ${rightSide}`);
-                    steps.push(`${v} = ±√(${rightSide})`);
-                    return { isError: false, hideDefaultCopy: false, displayHTML: steps.join('<br>'), copyText: `±√(${rightSide})` };
                 }
-            } else {
-                return { isError: true };
             }
+
+            // CASE 3: Trinomials (e.g., x^2 + 5x + 6 = 0)
+            else if (B !== 0 && C !== 0) {
+                let eqStr = `${A === 1 ? '' : (A === -1 ? '-' : A)}${v}^2${B > 0 ? '+' : ''}${B === 1 ? '' : (B === -1 ? '-' : B)}${v}${C > 0 ? '+' : ''}${C}=0`;
+                if (cleanInput.replace(/\s+/g,'') !== eqStr) steps.push(`${eqStr}`);
+
+                let g = gcdHelper(A, gcdHelper(B, C));
+                if (A < 0) g = -g;
+
+                let a1 = A / g, b1 = B / g, c1 = C / g;
+                let targetMult = a1 * c1, targetAdd = b1;
+                let f1 = null, f2 = null;
+
+                let limit = Math.abs(targetMult);
+                for (let i = -limit; i <= limit; i++) {
+                    if (i === 0) continue;
+                    if (targetMult % i === 0) {
+                        let j = targetMult / i;
+                        if (i + j === targetAdd) {
+                            f1 = i; f2 = j; break;
+                        }
+                    }
+                }
+
+                if (f1 === null) return { isError: true };
+
+                let gcd1 = gcdHelper(a1, f1);
+                let t1_a = a1 / gcd1, t1_c = f1 / gcd1;
+
+                let gcd2 = gcdHelper(a1, f2);
+                let t2_a = a1 / gcd2, t2_c = f2 / gcd2;
+
+                let f1_str = formatFactor(t1_a, t1_c, v);
+                let f2_str = formatFactor(t2_a, t2_c, v);
+                let g_str = g === 1 ? '' : (g === -1 ? '-' : g.toString());
+
+                steps.push(`${g_str}(${f1_str})(${f2_str})=0`);
+
+                // Factor 1
+                steps.push(`${f1_str}=0`);
+                let ans1 = simplifyFraction(-t1_c, t1_a);
+                steps.push(`${v}=${ans1}`);
+
+                // Factor 2
+                steps.push(`${f2_str}=0`);
+                let ans2 = simplifyFraction(-t2_c, t2_a);
+                steps.push(`${v}=${ans2}`);
+
+                return {
+                    isError: false,
+                    hideDefaultCopy: false,
+                    displayHTML: steps.join('<br>'),
+                    copyText: `${v}=${ans1}, ${v}=${ans2}`
+                };
+            }
+
+            return { isError: true };
         }
     } catch (e) {
         return { isError: true };
