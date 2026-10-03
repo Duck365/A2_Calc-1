@@ -431,8 +431,48 @@ function processMathUniversal(input, mode) {
                     }
                 }
 
-                if (f1 === null) return { isError: true };
+                // If factoring fails, use the Quadratic Formula
+                if (f1 === null) {
+                    steps.push(`<br><em>Cannot be easily factored. Using Quadratic Formula:</em>`);
+                    steps.push(`${v} = (-b ± √(b² - 4ac)) / 2a`);
+                    steps.push(`${v} = (-(${B}) ± √(${B}² - 4(${A})(${C}))) / 2(${A})`);
+                    
+                    let discriminant = (B * B) - (4 * A * C);
+                    let denominator = 2 * A;
+                    
+                    steps.push(`${v} = (${-B} ± √(${discriminant})) / ${denominator}`);
+                    
+                    let ansText = '';
+                    
+                    if (discriminant < 0) {
+                        let absDesc = Math.abs(discriminant);
+                        let sqrtVal = Math.sqrt(absDesc);
+                        
+                        // If the imaginary part is a perfect square
+                        if (sqrtVal % 1 === 0) {
+                            ansText = `${v} = (${-B} ± ${sqrtVal}i) / ${denominator}`;
+                        } else {
+                            ansText = `${v} = (${-B} ± i√${absDesc}) / ${denominator}`;
+                        }
+                    } else {
+                        let sqrtVal = Math.sqrt(discriminant);
+                        // If it's real but irrational
+                        if (sqrtVal % 1 !== 0) {
+                            ansText = `${v} = (${-B} ± √${discriminant}) / ${denominator}`;
+                        }
+                    }
+                    
+                    steps.push(`<strong>${ansText}</strong>`);
+                    
+                    return {
+                        isError: false,
+                        hideDefaultCopy: false,
+                        displayHTML: steps.join('<br>'),
+                        copyText: ansText
+                    };
+                }
 
+                // If factoring succeeds, continue with grouping
                 let gcd1 = gcdHelper(a1, f1);
                 let t1_a = a1 / gcd1, t1_c = f1 / gcd1;
 
