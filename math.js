@@ -128,7 +128,6 @@ function processMathUniversal(input, mode) {
         if (mode === 'simplify_radicals') {
             let clean = cleanInput.replace(/\s+/g, '');
             
-            // Normalize LaTeX or Unicode square roots to sqrt(x)
             clean = clean.replace(/\\sqrt\{?(-?\d+)\}?/g, 'sqrt($1)');
             clean = clean.replace(/√\({0,1}(-?\d+)\){0,1}/g, 'sqrt($1)');
 
@@ -161,7 +160,6 @@ function processMathUniversal(input, mode) {
                 }
             });
 
-            // Standardize format: Rearrange "i√5+2" into "2+i√5"
             let finalAns = simplified;
             let swapMatch = finalAns.match(/^([+-]?\d*i(?:√\d+)?)([+-]\d+)$/);
             if (swapMatch) {
@@ -174,9 +172,7 @@ function processMathUniversal(input, mode) {
                 }
             }
 
-            // Cleanup any stray formatting
             finalAns = finalAns.replace(/^\+/, '');
-
             steps.push(finalAns);
 
             return {
@@ -316,6 +312,7 @@ function processMathUniversal(input, mode) {
                 return x;
             };
 
+            // CASE 1: GCF Factoring
             if (B !== 0 && C === 0) {
                 let eqStr = `${A === 1 ? '' : (A === -1 ? '-' : A)}${v}^2${B > 0 ? '+' : ''}${B === 1 ? '' : (B === -1 ? '-' : B)}${v}=0`;
                 if (cleanInput.replace(/\s+/g,'') !== eqStr && !cleanInput.includes('²')) {
@@ -349,6 +346,7 @@ function processMathUniversal(input, mode) {
                 };
             } 
 
+            // CASE 2: Difference of Squares
             else if (B === 0 && C !== 0) {
                 let eqStr = `${A === 1 ? '' : (A === -1 ? '-' : A)}${v}^2${C > 0 ? '+' : ''}${C}=0`;
                 if (cleanInput.replace(/\s+/g,'') !== eqStr) steps.push(`${eqStr}`);
@@ -383,9 +381,34 @@ function processMathUniversal(input, mode) {
                         displayHTML: steps.join('<br>'),
                         copyText: `${v}=${ans1}, ${v}=${ans2}`
                     };
+                } else {
+                    // If not perfect squares, isolate x^2 and take the square root
+                    steps.push(`${A === 1 ? '' : (A === -1 ? '-' : A)}${v}^2=${-C}`);
+                    
+                    let val = -C / A;
+                    let ansText = '';
+                    
+                    if (A !== 1 && A !== -1 && -C % A !== 0) {
+                        let frac = simplifyFraction(-C, A);
+                        steps.push(`${v}^2=${frac}`);
+                        steps.push(`${v}=±√(${frac})`);
+                        ansText = `${v}=±√(${frac})`;
+                    } else {
+                        if (A !== 1 && A !== -1) steps.push(`${v}^2=${val}`);
+                        steps.push(`${v}=±√${val}`);
+                        ansText = `${v}=±√${val}`;
+                    }
+
+                    return {
+                        isError: false,
+                        hideDefaultCopy: false,
+                        displayHTML: steps.join('<br>'),
+                        copyText: ansText
+                    };
                 }
             }
 
+            // CASE 3: Trinomials
             else if (B !== 0 && C !== 0) {
                 let eqStr = `${A === 1 ? '' : (A === -1 ? '-' : A)}${v}^2${B > 0 ? '+' : ''}${B === 1 ? '' : (B === -1 ? '-' : B)}${v}${C > 0 ? '+' : ''}${C}=0`;
                 if (cleanInput.replace(/\s+/g,'') !== eqStr) steps.push(`${eqStr}`);
