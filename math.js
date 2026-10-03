@@ -9,9 +9,11 @@ function openCalculator(mode, modeName) {
     
     const inputElement = document.getElementById('math-input');
     if (mode === 'power_of_i') {
-        inputElement.placeholder = "Enter exponent (e.g., 4)... and press Enter";
+        inputElement.placeholder = "Enter exponent (e.g., 4)...";
     } else if (mode === 'complex_ops') {
         inputElement.placeholder = "Enter expression (e.g., (3+4i)+(7+11i))...";
+    } else if (mode === 'simplify_radicals') {
+        inputElement.placeholder = "Enter radical (e.g., \\sqrt{-48} or sqrt(-5)+2)...";
     } else {
         inputElement.placeholder = "Enter quadratic equation (e.g., x^2+5x+6=0)...";
     }
@@ -53,7 +55,7 @@ function processQuery(query) {
 
         if (result.isError) {
             const randNum = Math.floor(Math.random() * (500 - 50 + 1)) + 50;
-            sysMsg.innerHTML = `System: (<span class="error-text">Error ${randNum}:</span> Parsing Failed) Check the equation format.`;
+            sysMsg.innerHTML = `System: (<span class="error-text">Error ${randNum}:</span> Parsing Failed) Check the format.`;
         } else {
             sysMsg.innerHTML = `System:<br>${result.displayHTML}`;
             
@@ -123,8 +125,69 @@ function processMathUniversal(input, mode) {
     try {
         const cleanInput = input.trim();
 
-        if (mode === 'complex_ops') {
-            // Remove spaces and normalize isolated "i" to "1i"
+        if (mode === 'simplify_radicals') {
+            let clean = cleanInput.replace(/\s+/g, '');
+            
+            // Normalize LaTeX or Unicode square roots to sqrt(x)
+            clean = clean.replace(/\\sqrt\{?(-?\d+)\}?/g, 'sqrt($1)');
+            clean = clean.replace(/√\({0,1}(-?\d+)\){0,1}/g, 'sqrt($1)');
+
+            let steps = [];
+            steps.push(`${cleanInput}`);
+
+            let simplified = clean.replace(/sqrt\((-?\d+)\)/g, (match, numStr) => {
+                let n = parseInt(numStr, 10);
+                if (n === 0) return '0';
+                
+                let isNegative = n < 0;
+                let absN = Math.abs(n);
+                
+                let maxSquare = 1;
+                for (let i = 1; i * i <= absN; i++) {
+                    if (absN % (i * i) === 0) {
+                        maxSquare = i;
+                    }
+                }
+                
+                let remainder = absN / (maxSquare * maxSquare);
+                let coeff = maxSquare === 1 ? '' : maxSquare;
+                
+                if (isNegative) {
+                    if (remainder === 1) return `${coeff === '' ? '' : coeff}i`;
+                    return `${coeff}i√${remainder}`;
+                } else {
+                    if (remainder === 1) return `${maxSquare}`;
+                    return `${coeff}√${remainder}`;
+                }
+            });
+
+            // Standardize format: Rearrange "i√5+2" into "2+i√5"
+            let finalAns = simplified;
+            let swapMatch = finalAns.match(/^([+-]?\d*i(?:√\d+)?)([+-]\d+)$/);
+            if (swapMatch) {
+                let imag = swapMatch[1];
+                let real = swapMatch[2];
+                if (real.startsWith('+')) {
+                    finalAns = `${real.substring(1)}${imag.startsWith('-') ? imag : '+' + imag}`;
+                } else {
+                    finalAns = `${real}${imag.startsWith('-') ? imag : '+' + imag}`;
+                }
+            }
+
+            // Cleanup any stray formatting
+            finalAns = finalAns.replace(/^\+/, '');
+
+            steps.push(finalAns);
+
+            return {
+                isError: false,
+                hideDefaultCopy: false,
+                displayHTML: steps.join('<br>'),
+                copyText: finalAns
+            };
+        }
+
+        else if (mode === 'complex_ops') {
             let clean = cleanInput.replace(/\s+/g, '');
             clean = clean.replace(/\+i\)/g, '+1i)').replace(/\-i\)/g, '-1i)');
             
@@ -135,14 +198,13 @@ function processMathUniversal(input, mode) {
 
             let a1 = parseInt(match[1]);
             let b1 = parseInt(match[2]);
-            let op = match[3] || '*'; // If no operator, assume multiplication
+            let op = match[3] || '*'; 
             let a2 = parseInt(match[4]);
             let b2 = parseInt(match[5]);
 
             let steps = [];
             steps.push(`${cleanInput}`);
 
-            // Addition and Subtraction
             if (op === '+' || op === '-') {
                 let realPart = op === '+' ? a1 + a2 : a1 - a2;
                 let imagPart = op === '+' ? b1 + b2 : b1 - b2;
@@ -163,7 +225,6 @@ function processMathUniversal(input, mode) {
                     copyText: finalAns
                 };
             } 
-            // Multiplication (FOIL)
             else if (op === '*') {
                 let first = a1 * a2;
                 let outer = a1 * b2;
@@ -255,7 +316,6 @@ function processMathUniversal(input, mode) {
                 return x;
             };
 
-            // CASE 1: GCF Factoring
             if (B !== 0 && C === 0) {
                 let eqStr = `${A === 1 ? '' : (A === -1 ? '-' : A)}${v}^2${B > 0 ? '+' : ''}${B === 1 ? '' : (B === -1 ? '-' : B)}${v}=0`;
                 if (cleanInput.replace(/\s+/g,'') !== eqStr && !cleanInput.includes('²')) {
@@ -289,7 +349,6 @@ function processMathUniversal(input, mode) {
                 };
             } 
 
-            // CASE 2: Difference of Squares
             else if (B === 0 && C !== 0) {
                 let eqStr = `${A === 1 ? '' : (A === -1 ? '-' : A)}${v}^2${C > 0 ? '+' : ''}${C}=0`;
                 if (cleanInput.replace(/\s+/g,'') !== eqStr) steps.push(`${eqStr}`);
@@ -327,7 +386,6 @@ function processMathUniversal(input, mode) {
                 }
             }
 
-            // CASE 3: Trinomials
             else if (B !== 0 && C !== 0) {
                 let eqStr = `${A === 1 ? '' : (A === -1 ? '-' : A)}${v}^2${B > 0 ? '+' : ''}${B === 1 ? '' : (B === -1 ? '-' : B)}${v}${C > 0 ? '+' : ''}${C}=0`;
                 if (cleanInput.replace(/\s+/g,'') !== eqStr) steps.push(`${eqStr}`);
