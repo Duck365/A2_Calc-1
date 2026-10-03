@@ -8,8 +8,10 @@ function openCalculator(mode, modeName) {
     document.getElementById('mode-title').innerText = `MODE: ${modeName}`;
     
     const inputElement = document.getElementById('math-input');
-    if (mode === 'power_of_i') {
+    if (mode === 'power_of_i_basic') {
         inputElement.placeholder = "Enter exponent (e.g., 4)...";
+    } else if (mode === 'power_of_i') {
+        inputElement.placeholder = "Enter expression (e.g., 7i^60 + 4i^99 - 11i^106)...";
     } else if (mode === 'complex_ops') {
         inputElement.placeholder = "Enter expression (e.g., (3+4i)+(7+11i))...";
     } else if (mode === 'simplify_radicals') {
@@ -257,7 +259,7 @@ function processMathUniversal(input, mode) {
             }
         }
 
-        else if (mode === 'power_of_i') {
+        else if (mode === 'power_of_i_basic') {
             if (!/^-?\d+$/.test(cleanInput)) return { isError: true };
             const exponent = parseInt(cleanInput, 10);
             const mod = ((exponent % 4) + 4) % 4;
@@ -268,7 +270,102 @@ function processMathUniversal(input, mode) {
                 displayHTML: `i<sup>${exponent}</sup> = <span class="highlight-text">${answer}</span>`,
                 copyText: answer
             };
-        } 
+        }
+        
+        else if (mode === 'power_of_i') {
+            let clean = cleanInput.replace(/\s+/g, '');
+            let terms = clean.match(/[+-]?[^+-]+/g);
+            if (!terms) return { isError: true };
+
+            let realPart = 0;
+            let imagPart = 0;
+            
+            let step1 = []; // Substitutions
+            let step2 = []; // Simplified combinations
+
+            terms.forEach((term, index) => {
+                let hasI = term.includes('i');
+                let parts = term.split('i');
+                let coefStr = parts[0];
+                let coef = 1;
+                
+                if (coefStr === '+' || coefStr === '') coef = 1;
+                else if (coefStr === '-') coef = -1;
+                else coef = parseInt(coefStr, 10);
+
+                let displayCoef = Math.abs(coef);
+                let sign = coef >= 0 ? (index === 0 ? '' : '+ ') : '- ';
+                if (index === 0 && coef < 0) sign = '-';
+                
+                if (hasI) {
+                    let expMatch = term.match(/i\^(\d+)/);
+                    let exp = expMatch ? parseInt(expMatch[1], 10) : 1;
+                    let mod = exp % 4;
+                    
+                    let iVals = ['1', 'i', '-1', '-i'];
+                    let subVal = iVals[mod];
+                    
+                    // Display coefficient implicitly if it's 1 or -1
+                    let displayTermStr = (displayCoef === 1) ? `(${subVal})` : `${displayCoef}(${subVal})`;
+                    step1.push(`${sign}${displayTermStr}`);
+                    
+                    let evalReal = 0;
+                    let evalImag = 0;
+                    if (mod === 0) evalReal = coef;
+                    else if (mod === 1) evalImag = coef;
+                    else if (mod === 2) evalReal = -coef;
+                    else if (mod === 3) evalImag = -coef;
+                    
+                    realPart += evalReal;
+                    imagPart += evalImag;
+                    
+                    if (evalReal !== 0) {
+                        let s = evalReal >= 0 ? (step2.length === 0 ? '' : '+ ') : '- ';
+                        if (step2.length === 0 && evalReal < 0) s = '-';
+                        step2.push(`${s}${Math.abs(evalReal)}`);
+                    } else if (evalImag !== 0) {
+                        let s = evalImag >= 0 ? (step2.length === 0 ? '' : '+ ') : '- ';
+                        if (step2.length === 0 && evalImag < 0) s = '-';
+                        let valStr = Math.abs(evalImag) === 1 ? 'i' : `${Math.abs(evalImag)}i`;
+                        step2.push(`${s}${valStr}`);
+                    }
+                } else {
+                    realPart += coef;
+                    step1.push(`${sign}${displayCoef}`);
+                    let s = coef >= 0 ? (step2.length === 0 ? '' : '+ ') : '- ';
+                    if (step2.length === 0 && coef < 0) s = '-';
+                    step2.push(`${s}${Math.abs(coef)}`);
+                }
+            });
+
+            let finalAns = '';
+            if (realPart === 0 && imagPart === 0) finalAns = '0';
+            else if (realPart === 0) {
+                if (imagPart === 1) finalAns = 'i';
+                else if (imagPart === -1) finalAns = '-i';
+                else finalAns = `${imagPart}i`;
+            }
+            else if (imagPart === 0) finalAns = `${realPart}`;
+            else {
+                let imagSign = imagPart > 0 ? '+' : '-';
+                let absImag = Math.abs(imagPart);
+                let imagStr = absImag === 1 ? 'i' : `${absImag}i`;
+                finalAns = `${realPart}${imagSign}${imagStr}`;
+            }
+
+            let steps = [];
+            steps.push(cleanInput);
+            steps.push(step1.join(' '));
+            steps.push(step2.join(' '));
+            steps.push(`<strong>${finalAns}</strong>`);
+
+            return {
+                isError: false,
+                hideDefaultCopy: false,
+                displayHTML: steps.join('<br>'),
+                copyText: finalAns
+            };
+        }
         
         else if (mode === 'binomial_quad') {
             let A = 0, B = 0, C = 0, v = 'x';
